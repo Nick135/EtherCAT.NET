@@ -5,7 +5,7 @@
     <TargetFramework>netcoreapp3.0</TargetFramework>
   </PropertyGroup>
 
-  //"dotnet build" failed with error NETSDK1073 for the .NET core 3.0 app with reference to a .NET Standard 2.1 class lib
+  <!--"dotnet build" failed with error NETSDK1073 for the .NET core 3.0 app with reference to a .NET Standard 2.1 class lib-->
   <Target Name="WorkaroundNetStandard" AfterTargets="ResolvePackageAssets">
     <ItemGroup>
       <TransitiveFrameworkReference Remove="NETStandard.Library" />
