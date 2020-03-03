@@ -19,7 +19,7 @@ namespace SampleMaster
         static async Task Main(string[] args)
         {
             /* Set interface name. Edit this to suit your needs. */
-            var interfaceName = "eth0";
+            var interfaceName = "Ethernet1"; // "eth0";
 
             /* Set ESI location. Make sure it contains ESI files! The default path is /home/{user}/.local/share/ESI */
             var localAppDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -55,14 +55,29 @@ namespace SampleMaster
             /* create root slave info by scanning available slaves */
             var rootSlaveInfo = EcUtilities.ScanDevices(settings.InterfaceName);
 
-            rootSlaveInfo.Descendants().ToList().ForEach(current =>
+            foreach (var current in rootSlaveInfo.Descendants())
             {
-                ExtensibilityHelper.CreateDynamicData(settings.EsiDirectoryPath, extensionFactory, current);
-            });
+                try
+                {
+                    ExtensibilityHelper.CreateDynamicData(settings.EsiDirectoryPath, extensionFactory, current);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogInformation(ex.Message);
+                    Console.ReadKey(true);
+                    return;
+                }
+            }
 
             /* print list of slaves */
             var message = new StringBuilder();
             var slaves = rootSlaveInfo.Descendants().ToList();
+
+            // Example Slave 0 is EP3174-0002
+            var EP3174_0002 = slaves[0];
+            var EP3174_0002_Ch0 = EP3174_0002.DynamicData.PdoSet[0];
+            var EP3174_0002_Ch0_Variables = EP3174_0002_Ch0.VariableSet;
+            var EP3174_0002_Ch0_Variable0 = EP3174_0002_Ch0_Variables[0];
 
             message.AppendLine($"Found {slaves.Count()} slaves:");
 
@@ -93,23 +108,34 @@ namespace SampleMaster
                 var random = new Random();
                 var cts = new CancellationTokenSource();
 
+                var EP3174_0002_Ch0_Value = slaves[0].DynamicData.PdoSet[0].VariableSet.Last();
                 var task = Task.Run(() =>
                 {
                     var sleepTime = 1000 / (int)cycleFrequency;
 
                     while (!cts.IsCancellationRequested)
                     {
-                        master.UpdateIO(DateTime.UtcNow);
-
-                        unsafe
+                        try
                         {
-                            if (variables.Any())
+                            master.UpdateIO(DateTime.UtcNow);
+                            unsafe
                             {
-                                var myVariableSpan = new Span<int>(variables.First().DataPtr.ToPointer(), 1);
-                                myVariableSpan[0] = random.Next(0, 100);
+                                if (variables.Any())
+                                {
+                                    var inputCh0 = new Span<int>(EP3174_0002_Ch0_Value.DataPtr.ToPointer(), 1)[0].ToByteArray();
+                                    int inputValue = BitConverter.ToInt16(inputCh0);
+                                    double value = inputValue / 32767.0 * 10.0;
+                                    logger.LogDebug($"{EP3174_0002_Ch0_Value.Name}: {value}");
+
+                                    var myVariableSpan = new Span<int>(variables.First().DataPtr.ToPointer(), 1);
+                                    myVariableSpan[0] = random.Next(0, 100);
+                                }
                             }
                         }
-
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex.Message);
+                        }
                         Thread.Sleep(sleepTime);
                     }
                 }, cts.Token);

@@ -14,6 +14,7 @@ $path = "$($PSScriptRoot)/artifacts/bin32"
 New-Item -Force -ItemType directory -Path $path
 Set-Location -Path $path
 
+//$IsWindows=$true
 if ($IsWindows)
 {
 	cmake ./../../native -DCMAKE_CONFIGURATION_TYPES:STRING="Debug;Release" -G "Visual Studio 16 2019" -A "Win32"
